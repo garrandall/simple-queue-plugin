@@ -4,6 +4,8 @@ import hudson.model.Queue;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import cz.mendelu.xotradov.DefaultSorter;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,8 +13,6 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
 public class DefaultSorterTest {
-
-
     @Test
     public void sortBuildableItems() {
         DefaultSorter sorter = new DefaultSorter();

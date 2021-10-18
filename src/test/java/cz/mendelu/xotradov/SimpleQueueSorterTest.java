@@ -4,6 +4,9 @@ import hudson.model.Queue;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import cz.mendelu.xotradov.DefaultSorter;
+import cz.mendelu.xotradov.SimpleQueueSorter;
+
 import java.util.ArrayList;
 import java.util.List;
 

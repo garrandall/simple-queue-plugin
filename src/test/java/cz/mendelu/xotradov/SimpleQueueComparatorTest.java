@@ -4,6 +4,8 @@ import hudson.model.Queue;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import cz.mendelu.xotradov.SimpleQueueComparator;
+
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
