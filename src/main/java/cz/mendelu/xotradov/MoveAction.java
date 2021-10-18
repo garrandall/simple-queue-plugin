@@ -5,8 +5,13 @@ import hudson.Extension;
 import hudson.model.*;
 import hudson.model.queue.QueueSorter;
 import jenkins.model.Jenkins;
+import net.sf.json.JSONObject;
+
+import org.kohsuke.stapler.HttpResponses;
+import org.kohsuke.stapler.json.JsonHttpResponse;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
+import org.kohsuke.stapler.interceptor.RequirePOST;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -79,6 +84,66 @@ public class MoveAction implements RootAction {
         } catch (Exception e) {
             logger.warning(e.toString());
         }
+    }
+
+    /**
+     * Programmatic version of doMove, with JSON-formatted response
+     * /simpleMove/apiMove?itemId=A&moveType=B
+     *
+     * TODO: rip view out of this if not required
+     * TODO: maybe change successful response code/body
+     * TODO: cleanup strings
+     *
+     * @param request Stapler request from user
+     * @param response Stapler response send back to users browser
+     */
+    @RequirePOST
+    public void doApiMove(final StaplerRequest request, final StaplerResponse response) {
+        Jenkins j;
+        Queue queue;
+        Queue.Item item = null;
+        MoveType moveType = null;
+
+        if ((j = Jenkins.getInstanceOrNull()) == null) {
+            logger.warning("could not find jenkins");
+            raiseJsonHttpException("an error occured", 500);
+        }
+
+        if (!j.hasPermission(PermissionHandler.SIMPLE_QUEUE_MOVE_PERMISSION)) {
+            logger.warning("user does not have permission to move items in the queue");
+            raiseJsonHttpException(null, 403);
+        }
+
+        if ((queue = j.getQueue()) == null) {
+            logger.warning("could not find queue");
+            raiseJsonHttpException("an error occured", 500);
+        }
+
+        try {
+            item = queue.getItem(Long.parseLong(request.getParameter(ITEM_ID_PARAM_NAME)));
+        } catch (NumberFormatException nfe) {
+            String msg = "given itemId param missing or invalid";
+            logger.warning(msg);
+            raiseJsonHttpException(msg, 400);
+        }
+
+        if (item == null) {
+            String msg = "Could not find item for given itemId param";
+            logger.warning(msg);
+            raiseJsonHttpException(msg, 404);
+        }
+
+        try {
+            moveType = MoveType.valueOf(request.getParameter(MOVE_TYPE_PARAM_NAME));
+        } catch (Exception e) {
+            String msg = "given moveType param missing or invalid";
+            logger.warning(msg);
+            raiseJsonHttpException(msg, 400);
+        }
+
+        View view = j.getView(request.getParameter(VIEW_NAME_PARAM_NAME));
+        move(queue, item, moveType, view);
+        Queue.getInstance().maintain();
     }
 
     private void move(@Nonnull Queue queue,@Nonnull Queue.Item item,@Nonnull MoveType moveType, View view) {
@@ -435,4 +500,12 @@ public class MoveAction implements RootAction {
         queue.getSorter().sortBuildableItems(queue.getBuildableItems());
     }
 
+    private void raiseJsonHttpException(String message, int status) throws JsonHttpResponse {
+        JSONObject o = null;
+        if (message != null) {
+            o = new JSONObject();
+            o.accumulate("message", message);
+        }
+        throw new JsonHttpResponse(o, status);
+    }
 }
