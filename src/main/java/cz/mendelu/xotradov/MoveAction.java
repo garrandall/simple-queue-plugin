@@ -31,6 +31,8 @@ public class MoveAction implements RootAction {
     public static final String MOVE_TYPE_PARAM_NAME= "moveType";
     public static final String ITEM_ID_PARAM_NAME="itemId";
     public static final String VIEW_NAME_PARAM_NAME="viewName";
+    public static final String JOB_NAME_PARAM_NAME="jobName";
+    public static final String BUILD_NUMBER_PARAM_NAME="buildNumber";
     private boolean isSorterSet=false;
     @CheckForNull
     @Override
@@ -101,8 +103,9 @@ public class MoveAction implements RootAction {
     public void doApiMove(final StaplerRequest request, final StaplerResponse response) {
         Jenkins j;
         Queue queue;
-        Queue.Item item = null;
         MoveType moveType = null;
+        String jobName = null;
+        Long buildNumber = null;
 
         if ((j = Jenkins.getInstanceOrNull()) == null) {
             logger.warning("could not find jenkins");
@@ -119,18 +122,20 @@ public class MoveAction implements RootAction {
             raiseJsonHttpException("an error occured", 500);
         }
 
-        try {
-            item = queue.getItem(Long.parseLong(request.getParameter(ITEM_ID_PARAM_NAME)));
-        } catch (NumberFormatException nfe) {
-            String msg = "given itemId param missing or invalid";
+        jobName = request.getParameter(JOB_NAME_PARAM_NAME);
+
+        if (jobName == null) {
+            String msg = "given jobName param missing or invalid";
             logger.warning(msg);
             raiseJsonHttpException(msg, 400);
         }
 
-        if (item == null) {
-            String msg = "Could not find item for given itemId param";
+        try {
+            buildNumber = Long.parseLong(request.getParameter(BUILD_NUMBER_PARAM_NAME));
+        } catch (NumberFormatException nfe) {
+            String msg = "given buildNumber param missing or invalid";
             logger.warning(msg);
-            raiseJsonHttpException(msg, 404);
+            raiseJsonHttpException(msg, 400);
         }
 
         try {
@@ -141,8 +146,40 @@ public class MoveAction implements RootAction {
             raiseJsonHttpException(msg, 400);
         }
 
+        ArrayList<Queue.Item> matchingItems = new ArrayList<Queue.Item>();
+
+        Queue.Item[] items = queue.getItems();
+
+        for (int i = 0; i < items.length; i++) {
+            Queue.Item item = items[i];
+            String url = item.task.getUrl();
+            logger.info(String.valueOf(buildNumber));
+            logger.info(jobName);
+            logger.info(url);
+
+            if (url == null) continue;
+
+            // messy parsing job/buildnum
+            String[] components = url.split("/");
+            logger.info("components");
+            logger.info(String.valueOf(components[components.length-1]));
+            logger.info(String.valueOf(components[components.length-2]));
+            logger.info(String.valueOf(components[components.length-3]));
+            logger.info("endComponents");
+            if (String.valueOf(buildNumber).equals(components[components.length -1]) &&
+                    jobName.equals(components[components.length -2])) {
+                matchingItems.add(item);
+            }
+        }
+
+        logger.info(String.valueOf(matchingItems.size()));
+
         View view = j.getView(request.getParameter(VIEW_NAME_PARAM_NAME));
-        move(queue, item, moveType, view);
+
+        for (Queue.Item item : matchingItems) {
+            move(queue, item, moveType, view);
+        }
+
         Queue.getInstance().maintain();
     }
 
